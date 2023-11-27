@@ -26,6 +26,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     const userCollection = client.db("zzDB").collection("user");
+    const postCollection = client.db("zzDB").collection("post");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -49,9 +50,20 @@ async function run() {
       res.send(result);
     });
     app.get("/users", async (req, res) => {
-        const result = await userCollection.find().toArray();
-        res.send(result);
-      });
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
+    //   post related api
+    app.post("/post", async (req, res) => {
+      const item = req.body;
+      const result = await postCollection.insertOne(item);
+      res.send(result);
+    });
+    app.get("/post", async (req, res) => {
+      const result = await postCollection.find().toArray();
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
