@@ -30,19 +30,19 @@ async function run() {
 
     // middlewares
     const verifyToken = (req, res, next) => {
-        // console.log('inside verify token',req.headers.authorization);
-        if (!req.headers.authorization) {
-          return res.status(401).send({ message: "unauthorized access" });
+      // console.log('inside verify token',req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorized  access" });
         }
-        const token = req.headers.authorization.split(" ")[1];
-        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-          if (err) {
-            return res.status(401).send({ message: "unauthorized  access" });
-          }
-          req.decoded = decoded;
-          next();
-        });
-      };
+        req.decoded = decoded;
+        next();
+      });
+    };
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -69,31 +69,46 @@ async function run() {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
-    app.get("/users/:email",async (req,res)=>{
-        const email = req.params.email;
-        const query = {email: email};
-        const result = await userCollection.findOne(query);
-        res.send(result);
-    })
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      res.send(result);
+    });
 
-    //   post related api
+    // ---------------- post related api-----------------//
+
+    // add post
     app.post("/post", async (req, res) => {
       const item = req.body;
       const result = await postCollection.insertOne(item);
       res.send(result);
     });
+    // get post
     app.get("/post", async (req, res) => {
       const result = await postCollection.find().toArray();
       res.send(result);
     });
+    // get specific post
     app.get("/post/:id", async (req, res) => {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id)};
-        const result = await postCollection.findOne(query);
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await postCollection.findOne(query);
+      res.send(result);
+    });
+    // upvote 
+    app.patch("/post/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      try {
+        const result = await postCollection.updateOne(query, req.body);
         res.send(result);
-      });
+      } catch (error) {
+        console.error("Error updating post:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
 
-    // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
