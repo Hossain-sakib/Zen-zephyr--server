@@ -27,22 +27,9 @@ async function run() {
     await client.connect();
     const userCollection = client.db("zzDB").collection("user");
     const postCollection = client.db("zzDB").collection("post");
+    const commentCollection = client.db("zzDB").collection("comment");
 
     // middlewares
-    const verifyToken = (req, res, next) => {
-      // console.log('inside verify token',req.headers.authorization);
-      if (!req.headers.authorization) {
-        return res.status(401).send({ message: "unauthorized access" });
-      }
-      const token = req.headers.authorization.split(" ")[1];
-      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-          return res.status(401).send({ message: "unauthorized  access" });
-        }
-        req.decoded = decoded;
-        next();
-      });
-    };
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -96,17 +83,28 @@ async function run() {
       const result = await postCollection.findOne(query);
       res.send(result);
     });
-    // upvote 
+    // upvotes & downvote
     app.patch("/post/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-      try {
-        const result = await postCollection.updateOne(query, req.body);
-        res.send(result);
-      } catch (error) {
-        console.error("Error updating post:", error);
-        res.status(500).send({ message: "Internal Server Error" });
-      }
+      const result = await postCollection.updateOne(query, req.body);
+      res.send(result);
+    });
+
+    // --------comments---------//
+    // add comment
+    app.post("/comment", async (req, res) => {
+      const item = req.body;
+      const result = await commentCollection.insertOne(item);
+      res.send(result);
+    });
+    // get comment by post id
+    // Add this endpoint to your Express app
+    app.get("/post/:postId/comments", async (req, res) => {
+      const postId = req.params.postId;
+      const query = { postId: postId };
+      const comments = await commentCollection.find(query).toArray();
+      res.send(comments);
     });
 
     await client.db("admin").command({ ping: 1 });
