@@ -29,8 +29,10 @@ async function run() {
     const postCollection = client.db("zzDB").collection("post");
     const commentCollection = client.db("zzDB").collection("comment");
     const announcementCollection = client.db("zzDB").collection("announcement");
+    const reportCollection = client.db("zzDB").collection("report");
 
-    // jwt related api
+    // ------------jwt related api---------//
+
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -39,7 +41,9 @@ async function run() {
       res.send({ token });
     });
 
-    // middlewares
+    //--------- middlewares---------//
+
+    // verify token
     const verifyToken = (req, res, next) => {
       if (!req.headers.authorization) {
         return res.status(401).send({ message: "unauthorized access" });
@@ -66,7 +70,7 @@ async function run() {
       next();
     };
 
-    //   User related api
+    //-------User related api-------//
 
     // create user
     app.post("/users", async (req, res) => {
@@ -92,36 +96,48 @@ async function run() {
       res.send(result);
     });
     // make admin
-    app.patch("/users/admin/:id",verifyToken,verifyAdmin,async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await userCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/admin/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "admin",
+          },
+        };
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
 
-    app.get("/users/admin/:email", verifyToken,verifyAdmin,async (req, res) => {
-      const email = req.params.email;
-      if (email !== req.decoded.email) {
-        return res.status(403).send({ message: "forbidden access" });
+    // check admin
+
+    app.get(
+      "/users/admin/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let admin = false;
+        if (user) {
+          admin = user?.role === "admin";
+        }
+        res.send({ admin });
       }
-      const query = { email: email };
-      const user = await userCollection.findOne(query);
-      let admin = false;
-      if (user) {
-        admin = user?.role === "admin";
-      }
-      res.send({ admin });
-    });
+    );
 
     // ---------------- post related api-----------------//
 
     // add post
-    app.post("/post",verifyToken, async (req, res) => {
+    app.post("/post", verifyToken, async (req, res) => {
       const item = req.body;
       const result = await postCollection.insertOne(item);
       res.send(result);
@@ -139,14 +155,14 @@ async function run() {
       res.send(result);
     });
     // upvotes & downvote
-    app.patch("/post/:id",verifyToken, async (req, res) => {
+    app.patch("/post/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await postCollection.updateOne(query, req.body);
       res.send(result);
     });
     // delete post
-    app.delete("/post/:id",verifyToken, async (req, res) => {
+    app.delete("/post/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await postCollection.deleteOne(query);
@@ -154,24 +170,34 @@ async function run() {
     });
 
     // Get posts for a specific user
-    app.get("/user/:email/posts",verifyToken, async (req, res) => {
+    app.get("/user/:email/posts", verifyToken, async (req, res) => {
       const userEmail = req.params.email;
       const query = { authorEmail: userEmail };
       const userPosts = await postCollection.find(query).toArray();
       res.send(userPosts);
     });
 
-    // ...
-
     // --------comments---------//
     // add comment
-    app.post("/comment",verifyToken, async (req, res) => {
+    app.post("/comment", verifyToken, async (req, res) => {
       const item = req.body;
       const result = await commentCollection.insertOne(item);
       res.send(result);
     });
+    // get comment
+    app.get("/comment", verifyToken,verifyAdmin, async (req, res) => {
+      const result = await commentCollection.find().toArray();
+      res.send(result);
+    });
+    // delete comment
+    app.delete("/comment/:id", verifyToken,verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await commentCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // get comment by post id
-    // Add this endpoint to your Express app
     app.get("/post/:postId/comments", async (req, res) => {
       const postId = req.params.postId;
       const query = { postId: postId };
@@ -179,17 +205,41 @@ async function run() {
       res.send(comments);
     });
 
-
     // ---------announcements----------//
-    app.post("/announcements",verifyToken,verifyAdmin, async (req, res) => {
+
+    // post announcement
+    app.post("/announcements", verifyToken, verifyAdmin, async (req, res) => {
       const item = req.body;
       const result = await announcementCollection.insertOne(item);
       res.send(result);
     });
-    app.get("/announcements",verifyToken, async (req, res) => {
+    // get announcement
+    app.get("/announcements", verifyToken, async (req, res) => {
       const result = await announcementCollection.find().toArray();
       res.send(result);
     });
+
+    // --------report---------//
+
+    // post report
+    app.post("/reports", verifyToken, async (req, res) => {
+      const item = req.body;
+      const result = await reportCollection.insertOne(item);
+      res.send(result);
+    });
+    // get report
+    app.get("/reports", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await reportCollection.find().toArray();
+      res.send(result);
+    });
+    // delete report
+    app.delete("/reports/:id", verifyToken,verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await reportCollection.deleteOne(query);
+      res.send(result);
+    });
+    
 
     await client.db("admin").command({ ping: 1 });
     console.log(
