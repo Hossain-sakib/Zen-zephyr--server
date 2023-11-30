@@ -62,6 +62,18 @@ async function run() {
       const result = await userCollection.findOne(query);
       res.send(result);
     });
+    // make admin
+    app.patch('/users/admin/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: 'admin'
+        }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
 
     // ---------------- post related api-----------------//
 
@@ -90,6 +102,27 @@ async function run() {
       const result = await postCollection.updateOne(query, req.body);
       res.send(result);
     });
+    // delete post
+    app.delete("/post/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await postCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
+    // get user specific post
+    // ...
+
+    // Get posts for a specific user
+    app.get("/user/:email/posts", async (req, res) => {
+        const userEmail = req.params.email;
+        const query = { authorEmail: userEmail };
+        const userPosts = await postCollection.find(query).toArray();
+        res.send(userPosts);
+    });
+
+    // ...
 
     // --------comments---------//
     // add comment
