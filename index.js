@@ -179,6 +179,18 @@ async function run() {
       res.send(comments);
     });
 
+
+    // ---------announcements----------//
+    app.post("/announcements",verifyToken,verifyAdmin, async (req, res) => {
+      const item = req.body;
+      const result = await announcementCollection.insertOne(item);
+      res.send(result);
+    });
+    app.get("/announcements",verifyToken, async (req, res) => {
+      const result = await announcementCollection.find().toArray();
+      res.send(result);
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
