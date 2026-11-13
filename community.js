@@ -54,19 +54,25 @@ function createCommunityRouter({ getCollections, authenticate = createFirebaseAu
     return post;
   }
   async function postDTO(db, post, identity) {
-    const profile = post.authorUid ? await db.users.findOne({ uid: post.authorUid }) : await db.users.findOne({ email: post.authorEmail });
-    const saved = identity ? await db.saved.findOne({ _id: pairId(identity.uid, String(post._id)) }) : null;
+    const [profile, saved, comments] = await Promise.all([
+      db.users.findOne(post.authorUid ? { uid: post.authorUid } : { email: post.authorEmail }),
+      identity ? db.saved.findOne({ _id: pairId(identity.uid, String(post._id)) }) : null,
+      db.comments.countDocuments({ postId: String(post._id) }),
+    ]);
     return { id: String(post._id), isDemo: !!post.isDemo, title: post.title || '', content: post.description || '', topic: post.tag || 'Everyday life',
       image: post.imageUrl || '', visibility: post.visibility || 'public', createdAt: post.createdAt,
       author: profile ? publicProfile(profile) : { id: post.authorUid || null, name: post.authorName || 'Community member', image: post.authorImage || '' },
       likes: post.upVotes?.length || 0, liked: !!identity && !!post.upVotes?.includes(identity.email), saved: !!saved,
-      comments: await db.comments.countDocuments({ postId: String(post._id) }),
+      comments,
       canEdit: !!identity && (post.authorUid ? post.authorUid === identity.uid : post.authorEmail === identity.email) };
   }
   async function postAuthorUid(db, post) {
     return post.authorUid || (await db.users.findOne({ email: post.authorEmail }))?.uid;
   }
-  router.get('/stats', database, wrap(async (req, res) => res.json({ members: await req.db.users.countDocuments(), demoMembers: await req.db.users.countDocuments({ isDemo: true }), posts: await req.db.posts.countDocuments({ visibility: { $ne: 'friends' } }) })));
+  router.get('/stats', database, wrap(async (req, res) => {
+    const [members, demoMembers, posts] = await Promise.all([req.db.users.countDocuments(), req.db.users.countDocuments({ isDemo: true }), req.db.posts.countDocuments({ visibility: { $ne: 'friends' } })]);
+    res.json({ members, demoMembers, posts });
+  }));
   router.get('/me', ...secure, wrap(async (req, res) => {
     const profile = await ensureProfile(req.db, req.decoded);
     res.json({ ...publicProfile(profile), isAdmin: profile.role === 'admin',
